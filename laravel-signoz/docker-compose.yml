@@ -1,0 +1,20 @@
+services:
+  laravel-app:
+    image: php:8.2-cli      # image publik resmi PHP
+    container_name: laravel-app
+    network_mode: "host"
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+      - ./database:/var/www/database
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "true"
+      OTEL_SERVICE_NAME: laravel-k8s
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://10.8.60.123:4318
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_PHP_AUTOLOAD_ENABLED: "true"
+    command: ["sh", "/var/www/start.sh"]
+
