@@ -1,0 +1,76 @@
+FROM php:8.2-fpm
+
+# ===============================
+# System dependencies
+# ===============================
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    curl \
+    libzip-dev \
+    libonig-dev \
+    libxml2-dev \
+    nginx \
+    && docker-php-ext-install \
+        pdo \
+        pdo_mysql \
+        mbstring \
+        zip \
+        xml \
+    && apt-get clean
+
+# ===============================
+# Install OpenTelemetry PHP Extension
+# ===============================
+RUN pecl install opentelemetry \
+    && docker-php-ext-enable opentelemetry
+
+# ===============================
+# Install Composer
+# ===============================
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www
+
+# ===============================
+# Copy composer files first (CACHE FRIENDLY)
+# ===============================
+COPY composer.json composer.lock ./
+
+# ===============================
+# Install OpenTelemetry packages
+# ===============================
+RUN composer require \
+    open-telemetry/opentelemetry-auto-laravel \
+    open-telemetry/sdk \
+    open-telemetry/api \
+    open-telemetry/exporter-otlp \
+    --no-interaction --no-scripts
+
+# ===============================
+# Copy application
+# ===============================
+COPY . .
+
+# ===============================
+# Final composer install
+# ===============================
+RUN composer install --no-dev --optimize-autoloader
+
+# ===============================
+# OpenTelemetry ENV DEFAULT
+# ===============================
+ENV OTEL_SERVICE_NAME="laravel-otel" \
+    OTEL_TRACES_EXPORTER="otlp" \
+    OTEL_LOGS_EXPORTER="none" \
+    OTEL_METRICS_EXPORTER="none" \
+    OTEL_PHP_AUTOLOAD_ENABLED="true"
+
+# ===============================
+# Nginx config
+# ===============================
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+EXPOSE 80
+
+CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]
